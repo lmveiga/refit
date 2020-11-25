@@ -808,6 +808,7 @@ namespace Refit
                 {
                     ct = paramList.OfType<CancellationToken>().FirstOrDefault();
                 }
+                
 
                 using var resp = await client.SendAsync(rq, ct).ConfigureAwait(false);
 

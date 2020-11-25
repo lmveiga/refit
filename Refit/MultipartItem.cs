@@ -1,7 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading.Tasks;
 
 namespace Refit
 {
@@ -40,17 +42,42 @@ namespace Refit
 
     public class StreamPart : MultipartItem
     {
-        public StreamPart(Stream value, string fileName, string contentType = null, string name = null) :
+        public StreamPart(Stream value, string fileName, string contentType = null, string name = null, Action<double> progress = null) :
             base(fileName, contentType, name)
         {
             Value = value ?? throw new ArgumentNullException("value");
+            Progress = progress;
         }
 
         public Stream Value { get; }
+        private Action<double> Progress { get; }
 
         protected override HttpContent CreateContent()
         {
-            return new StreamContent(Value);
+            return new StreamProgressContent(Value, Progress);
+        }
+    }
+
+    public class StreamProgressContent : StreamContent
+    {
+
+        const int ChunkSize = 4096;
+        readonly byte[] bytes;
+        readonly Action<double> progress;
+
+        public StreamProgressContent(Stream content, Action<double> progress) : base(content)
+        {
+            this.progress = progress;
+            this.bytes = new byte[content.Length];
+        }
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext context)
+        {
+            for (var i = 0; i < bytes.Length; i+= ChunkSize)
+            {
+                await stream.WriteAsync(this.bytes, i, Math.Min(ChunkSize, bytes.Length - i));
+                progress?.Invoke(100.0 * i / bytes.Length);
+            }
         }
     }
 
